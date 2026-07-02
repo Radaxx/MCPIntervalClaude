@@ -130,4 +130,27 @@ Tous les tools sont en lecture seule et retournent des données déjà agrégée
 
 ## 9. Hébergement distant (HTTP/SSE)
 
-Ce serveur tourne pour l'instant en local via stdio. Pour l'utiliser comme connecteur personnalisé distant dans claude.ai, il faudra migrer vers un transport HTTP (Streamable HTTP ou SSE) hébergé — voir la discussion dédiée une fois la version locale validée.
+Ce serveur tourne pour l'instant en local via stdio (un seul utilisateur = toi, un seul process). Pour l'utiliser comme connecteur personnalisé distant dans claude.ai, deux changements structurels sont nécessaires avant de choisir un hébergeur.
+
+### Transport
+
+Le SDK MCP a remplacé l'ancien transport "HTTP+SSE" par **Streamable HTTP** (un seul endpoint POST, avec streaming optionnel) : c'est le transport recommandé aujourd'hui, le SSE pur est legacy. Le SDK expose aussi une variante "web standard" (basée sur `fetch`/`Request`/`Response`) qui tourne nativement sur les runtimes edge (Cloudflare Workers, Deno) sans dépendre du module `http` de Node.
+
+### Authentification
+
+Une clé API unique en variable d'env n'est plus suffisante dès que le serveur est exposé publiquement : il faut une couche d'auth entre claude.ai et le serveur, sinon n'importe qui connaissant l'URL pourrait lire tes données d'entraînement. claude.ai attend en général une authentification OAuth 2.1 côté serveur MCP distant pour les connecteurs personnalisés. Le comportement exact et à jour de claude.ai sur ce point (OAuth strictement requis ou non pour un connecteur privé) est à vérifier en conditions réelles au moment de brancher le connecteur.
+
+### Comparatif des options d'hébergement
+
+| | **Cloudflare Workers** | **Fly.io** |
+|---|---|---|
+| Modèle | Edge serverless, `fetch` handler | Container Node persistant |
+| Transport | Web-standard Streamable HTTP du SDK, natif | Streamable HTTP via `http.createServer`/Express, quasi le même code qu'en local |
+| OAuth | Lib officielle `workers-oauth-provider` de Cloudflare (utilisée dans leurs démos MCP), assez clé-en-main | À implémenter/intégrer soi-même (plus de travail) |
+| Secrets | `wrangler secret put` | `fly secrets set` |
+| Coût / ops | Généreux tier gratuit, zéro serveur à gérer, TLS/domaine custom faciles | Petit coût mensuel, déploiement du conteneur à gérer soi-même |
+| Effort de migration | Moyen (adapter le transport + ajouter OAuth) | Faible sur le code (proche du stdio actuel), moyen sur l'OAuth |
+
+**Recommandation** : Cloudflare Workers, pour le transport web-standard qui colle bien au SDK et la lib OAuth prête à l'emploi — ça évite d'écrire un serveur OAuth 2.1 à la main. Fly.io reste une bonne option si tu préfères garder un modèle "process Node classique" que tu contrôles entièrement.
+
+Cette migration n'a pas encore été implémentée : elle est prévue une fois la version locale (stdio) validée avec de vrais appels à l'API Intervals.icu, pour éviter de découvrir un problème de mapping de champs une fois déployé.
