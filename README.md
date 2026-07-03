@@ -2,7 +2,7 @@
 
 Serveur [MCP](https://modelcontextprotocol.io) qui expose tes données [Intervals.icu](https://intervals.icu) (activités, wellness, profil athlète, charge d'entraînement, séances planifiées) à Claude — en local via Claude Desktop / Claude Code, similaire au connecteur Strava officiel.
 
-Lecture seule : ce serveur n'effectue aucune écriture sur ton compte Intervals.icu.
+Principalement en lecture : 6 des 7 tools ne font que lire tes données. Un seul tool écrit sur ton compte — `create_planned_workout`, qui ajoute des séances au calendrier (voir section 6 et 7).
 
 ## 1. Obtenir ta clé API et ton Athlete ID
 
@@ -70,7 +70,7 @@ Ajoute une entrée dans `mcpServers` (adapte le chemin absolu vers `dist/index.j
 }
 ```
 
-Redémarre Claude Desktop. Le connecteur "intervals-icu" doit apparaître avec ses 6 tools.
+Redémarre Claude Desktop. Le connecteur "intervals-icu" doit apparaître avec ses 7 tools.
 
 ## 5. Ajouter le serveur à Claude Code
 

@@ -89,6 +89,13 @@ Le tier gratuit de Cloudflare Workers couvre largement un usage personnel, mais 
 ## 10. Dépannage
 
 - **`wrangler deploy` échoue sur `compatibility_date`** : mets à jour la valeur dans `wrangler.jsonc` avec la date suggérée par l'erreur.
+- **`wrangler deploy` échoue avec "You need a workers.dev subdomain" (code 10063)** : ton compte Cloudflare n'a pas encore de sous-domaine `workers.dev`. Dans le dashboard, **Workers & Pages** propose normalement de le créer au premier accès. Si cette page ne le propose pas (bug côté Cloudflare déjà rencontré), crée-le via l'API directement :
+  ```bash
+  curl -X PUT "https://api.cloudflare.com/client/v4/accounts/<TON_ACCOUNT_ID>/workers/subdomain" \
+    -H "Authorization: Bearer <TON_API_TOKEN>" \
+    -H "Content-Type: application/json" \
+    --data '{"subdomain":"<le-nom-que-tu-veux>"}'
+  ```
+  (Account ID via `wrangler whoami` ; token créé sur https://dash.cloudflare.com/profile/api-tokens avec la permission `Account > Workers Scripts > Edit`.) Relance ensuite `npm run deploy`.
 - **401 après connexion réussie** : vérifie que le secret `INTERVALS_API_KEY` déployé (`wrangler secret put`) est bien ta clé actuelle, pas celle du `.dev.vars` local.
-- **La page `/authorize` renvoie "Session expirée"** : le jeton CSRF a expiré (10 min) ou les cookies sont bloqués par le navigateur — réessaie le flux depuis le début côté claude.ai.
 - **Erreur liée au KV namespace au déploiement** : l'`id` dans `wrangler.jsonc` doit correspondre exactement à celui retourné par `wrangler kv namespace create OAUTH_KV`.
