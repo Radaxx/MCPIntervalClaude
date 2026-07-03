@@ -34,16 +34,28 @@ export interface ListEventsParams {
   category?: string;
 }
 
+export interface CreateEventParams {
+  date: string;
+  type: string;
+  name: string;
+  description?: string;
+  durationSec?: number;
+  distanceM?: number;
+  load?: number;
+}
+
 interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
+  body?: unknown;
   timeoutMs?: number;
 }
 
 /**
- * Client HTTP minimal pour l'API REST Intervals.icu (lecture seule).
- * Authentification HTTP Basic : username fixe "API_KEY", password = clé
- * API personnelle. La clé n'est jamais journalisée, y compris en cas
- * d'erreur (voir handleErrorResponse).
+ * Client HTTP minimal pour l'API REST Intervals.icu. Authentification HTTP
+ * Basic : username fixe "API_KEY", password = clé API personnelle. La clé
+ * n'est jamais journalisée, y compris en cas d'erreur (voir
+ * handleErrorResponse). Seule createEvent effectue une écriture (POST) ;
+ * toutes les autres méthodes sont en lecture seule (GET).
  */
 export class IntervalsClient {
   private readonly baseUrl: string;
@@ -123,7 +135,38 @@ export class IntervalsClient {
     );
   }
 
+  /**
+   * Crée une séance planifiée dans le calendrier Intervals.icu (écriture).
+   * `description` peut utiliser la syntaxe texte structurée d'Intervals.icu
+   * (échauffement/intervalles/récupération avec cibles), auquel cas
+   * icu_training_load est généralement calculé automatiquement si non fourni.
+   */
+  async createEvent(params: CreateEventParams): Promise<IntervalsEvent> {
+    return this.post<IntervalsEvent>(`/athlete/${encodeURIComponent(this.athleteId)}/events`, {
+      category: "WORKOUT",
+      start_date_local: `${params.date}T00:00:00`,
+      type: params.type,
+      name: params.name,
+      description: params.description,
+      moving_time: params.durationSec,
+      distance: params.distanceM,
+      icu_training_load: params.load,
+    });
+  }
+
   private async get<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    return this.request<T>(path, "GET", options);
+  }
+
+  private async post<T>(path: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+    return this.request<T>(path, "POST", { ...options, body });
+  }
+
+  private async request<T>(
+    path: string,
+    method: "GET" | "POST",
+    options: RequestOptions = {},
+  ): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
     if (options.query) {
       for (const [key, value] of Object.entries(options.query)) {
@@ -139,11 +182,13 @@ export class IntervalsClient {
     let response: Response;
     try {
       response = await fetch(url, {
-        method: "GET",
+        method,
         headers: {
           Authorization: this.authHeader,
           Accept: "application/json",
+          ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         },
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
         signal: controller.signal,
       });
     } catch (err) {

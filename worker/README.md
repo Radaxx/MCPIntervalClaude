@@ -2,11 +2,11 @@
 
 Version hébergée du serveur MCP Intervals.icu, à ajouter comme **connecteur personnalisé distant** dans claude.ai. Transport Streamable HTTP + authentification OAuth 2.1 (via [`@cloudflare/workers-oauth-provider`](https://github.com/cloudflare/workers-oauth-provider)), gardée par un mot de passe personnel.
 
-Réutilise le client Intervals.icu et les 6 tools du serveur stdio (`../src/client`, `../src/tools`) — un seul code métier, deux façons de le déployer.
+Réutilise le client Intervals.icu et les 7 tools du serveur stdio (`../src/client`, `../src/tools`) — un seul code métier, deux façons de le déployer.
 
 ## Architecture
 
-- `IntervalsMcp` (`src/index.ts`) : un [`McpAgent`](https://github.com/cloudflare/agents) — un Durable Object par session cliente, qui enregistre les mêmes 6 tools que la version stdio.
+- `IntervalsMcp` (`src/index.ts`) : un [`McpAgent`](https://github.com/cloudflare/agents) — un Durable Object par session cliente, qui enregistre les mêmes 7 tools que la version stdio.
 - `OAuthProvider` : gère l'enregistrement dynamique des clients (claude.ai), l'émission/validation des jetons, et protège l'unique route `/mcp`.
 - Écran `/authorize` : simple formulaire mot de passe (protégé par un jeton CSRF), sans dépendance externe (pas de CDN). Ce mot de passe (`OWNER_PASSWORD`) est **distinct** de ta clé API Intervals.icu — c'est juste la porte d'entrée qui autorise un client MCP à obtenir un jeton.
 
@@ -60,7 +60,7 @@ Wrangler affiche l'URL publique, du type `https://intervals-icu-mcp.<ton-sous-do
 1. Sur claude.ai : **Settings → Connectors → Add custom connector**.
 2. Colle l'URL du endpoint MCP : `https://intervals-icu-mcp.<ton-sous-domaine>.workers.dev/mcp`.
 3. claude.ai découvre automatiquement la configuration OAuth (`/.well-known/oauth-authorization-server`), s'enregistre dynamiquement comme client, puis te redirige vers l'écran `/authorize`.
-4. Entre ton `OWNER_PASSWORD`. Une fois validé, claude.ai reçoit un jeton d'accès (durée par défaut : 1h, renouvelable via refresh token ~30 jours) et les 6 tools apparaissent.
+4. Entre ton `OWNER_PASSWORD`. Une fois validé, claude.ai reçoit un jeton d'accès (durée par défaut : 1h, renouvelable via refresh token ~30 jours) et les 7 tools apparaissent (dont 1 en écriture).
 
 Le comportement exact de l'UI "custom connector" de claude.ai (position du champ, wording) peut évoluer — si l'ajout échoue, vérifie d'abord que `https://.../mcp` répond bien (voir section Dépannage) avant de suspecter la config OAuth.
 

@@ -104,7 +104,7 @@ Vérifie ensuite avec `claude mcp list` que le serveur est bien détecté.
 
 ## 6. Tools disponibles
 
-Tous les tools sont en lecture seule et retournent des données déjà agrégées (pas le JSON brut complet de l'API).
+6 tools en lecture seule (données déjà agrégées, pas le JSON brut complet de l'API) et 1 tool en écriture, clairement marqué comme tel.
 
 | Tool | Description | Paramètres |
 |---|---|---|
@@ -114,11 +114,13 @@ Tous les tools sont en lecture seule et retournent des données déjà agrégée
 | `get_athlete_profile` | FTP, zones FC/allure/puissance, poids, unités | — |
 | `get_training_load_summary` | CTL/ATL/TSB et tendance hebdomadaire | `weeks` (optionnel, défaut 4) |
 | `get_planned_workouts` | Séances planifiées à venir | `oldest`, `newest` (optionnels, défaut : 14 prochains jours), `limit` (optionnel) |
+| `create_planned_workout` ⚠️ **écriture** | Ajoute une séance planifiée dans le calendrier Intervals.icu | `date`, `type`, `name`, `description` (optionnel, syntaxe structurée Intervals.icu), `planned_duration_minutes`, `planned_distance_km`, `planned_load` (optionnels) |
 
 ## 7. Sécurité
 
 - Authentification HTTP Basic (`username: API_KEY`, `password: <ta clé>`), jamais journalisée, y compris en cas d'erreur.
-- Aucune opération d'écriture n'est exposée : seuls des appels `GET` sont effectués vers l'API Intervals.icu.
+- 6 des 7 tools sont strictement en lecture (`GET`). Un seul tool écrit sur ton compte : `create_planned_workout`, qui **crée** une nouvelle séance dans le calendrier — il ne modifie ni ne supprime jamais une activité ou une séance existante.
+- `create_planned_workout` est marqué `readOnlyHint: false` dans son schéma MCP : Claude Desktop/Code et claude.ai doivent te demander confirmation avant de l'exécuter (comportement standard du client MCP, pas garanti à 100% selon le client).
 - Les erreurs 401 (clé invalide) et 429 (rate limit) sont détectées et renvoient un message clair au lieu de faire échouer silencieusement l'appel.
 
 ## 8. Dépannage
@@ -130,7 +132,7 @@ Tous les tools sont en lecture seule et retournent des données déjà agrégée
 
 ## 9. Hébergement distant (HTTP/SSE) — connecteur claude.ai
 
-La version hébergée est implémentée dans [`worker/`](./worker) : un serveur MCP sur Cloudflare Workers, transport Streamable HTTP, protégé par OAuth 2.1 (`@cloudflare/workers-oauth-provider`) derrière un écran de connexion par mot de passe personnel. Elle réutilise le même client Intervals.icu et les mêmes 6 tools que la version stdio (`src/client`, `src/tools`) — un seul code métier, deux modes de déploiement.
+La version hébergée est implémentée dans [`worker/`](./worker) : un serveur MCP sur Cloudflare Workers, transport Streamable HTTP, protégé par OAuth 2.1 (`@cloudflare/workers-oauth-provider`) derrière un écran de connexion par mot de passe personnel. Elle réutilise le même client Intervals.icu et les mêmes 7 tools que la version stdio (`src/client`, `src/tools`) — un seul code métier, deux modes de déploiement.
 
 Voir **[`worker/README.md`](./worker/README.md)** pour : créer le KV namespace OAuth, définir les secrets (`wrangler secret put`), tester en local (`npm run dev`), déployer (`npm run deploy`), et ajouter l'URL obtenue comme connecteur personnalisé dans claude.ai (Settings → Connectors → Add custom connector).
 
