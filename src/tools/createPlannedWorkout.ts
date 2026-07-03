@@ -30,6 +30,12 @@ const inputShape = {
         "Course à pied : Warmup\n- 10m 60-70% Pace\n\nMain set\n6x\n- 3m 95-100% Pace\n- 2m 60% Pace\n\nCooldown\n- 10m 60% Pace\n\n" +
         "Avec ce format, Intervals.icu calcule automatiquement la durée totale et la charge " +
         "d'entraînement (pas besoin de renseigner planned_duration_minutes/planned_load). " +
+        "Pour les séances de renforcement musculaire (type WeightTraining ou similaire) : NE PAS " +
+        "utiliser cette syntaxe structurée (testée, elle ne gère pas les séries/répétitions/charge " +
+        "et le multiplicateur 'Nx' ne s'applique pas fiablement avec plusieurs blocs à la suite). " +
+        "Écrire simplement la séance en texte libre (exercices, séries, répétitions, charge en kg), " +
+        "et renseigner soi-même planned_duration_minutes/planned_load si on veut ces valeurs " +
+        "affichées, puisqu'Intervals.icu ne les calculera pas automatiquement dans ce cas. " +
         "Laisser vide (ou en prose libre) pour une simple note sans étapes ni cibles.",
     ),
   planned_duration_minutes: z
