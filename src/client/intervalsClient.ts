@@ -44,6 +44,16 @@ export interface CreateEventParams {
   load?: number;
 }
 
+export interface UpdateEventParams {
+  date?: string;
+  type?: string;
+  name?: string;
+  description?: string;
+  durationSec?: number;
+  distanceM?: number;
+  load?: number;
+}
+
 interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
@@ -54,8 +64,8 @@ interface RequestOptions {
  * Client HTTP minimal pour l'API REST Intervals.icu. Authentification HTTP
  * Basic : username fixe "API_KEY", password = clé API personnelle. La clé
  * n'est jamais journalisée, y compris en cas d'erreur (voir
- * handleErrorResponse). Seule createEvent effectue une écriture (POST) ;
- * toutes les autres méthodes sont en lecture seule (GET).
+ * handleErrorResponse). createEvent/updateEvent/deleteEvent écrivent sur le
+ * calendrier ; toutes les autres méthodes sont en lecture seule (GET).
  */
 export class IntervalsClient {
   private readonly baseUrl: string;
@@ -154,6 +164,39 @@ export class IntervalsClient {
     });
   }
 
+  async getEvent(eventId: string): Promise<IntervalsEvent> {
+    return this.get<IntervalsEvent>(`/athlete/${encodeURIComponent(this.athleteId)}/events/${encodeURIComponent(eventId)}`);
+  }
+
+  /**
+   * Modifie une séance existante (écriture). L'API Intervals.icu attend une
+   * représentation complète de l'événement (PUT), donc on relit d'abord
+   * l'événement courant et on fusionne uniquement les champs fournis, pour
+   * ne jamais effacer un champ que l'appelant n'a pas voulu changer.
+   */
+  async updateEvent(eventId: string, params: UpdateEventParams): Promise<IntervalsEvent> {
+    const current = await this.getEvent(eventId);
+    const path = `/athlete/${encodeURIComponent(this.athleteId)}/events/${encodeURIComponent(eventId)}`;
+    return this.put<IntervalsEvent>(path, {
+      ...current,
+      start_date_local: params.date ? `${params.date}T00:00:00` : current.start_date_local,
+      type: params.type ?? current.type,
+      name: params.name ?? current.name,
+      description: params.description ?? current.description,
+      moving_time: params.durationSec ?? current.moving_time,
+      distance: params.distanceM ?? current.distance,
+      icu_training_load: params.load ?? current.icu_training_load,
+    });
+  }
+
+  /** Supprime une séance planifiée (écriture, irréversible). */
+  async deleteEvent(eventId: string): Promise<void> {
+    await this.request<void>(
+      `/athlete/${encodeURIComponent(this.athleteId)}/events/${encodeURIComponent(eventId)}`,
+      "DELETE",
+    );
+  }
+
   private async get<T>(path: string, options: RequestOptions = {}): Promise<T> {
     return this.request<T>(path, "GET", options);
   }
@@ -162,9 +205,13 @@ export class IntervalsClient {
     return this.request<T>(path, "POST", { ...options, body });
   }
 
+  private async put<T>(path: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+    return this.request<T>(path, "PUT", { ...options, body });
+  }
+
   private async request<T>(
     path: string,
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT" | "DELETE",
     options: RequestOptions = {},
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
@@ -207,6 +254,10 @@ export class IntervalsClient {
 
     if (!response.ok) {
       await this.handleErrorResponse(path, response);
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
     }
 
     return (await response.json()) as T;
