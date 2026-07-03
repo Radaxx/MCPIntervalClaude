@@ -62,7 +62,7 @@ function loginPage(opts: { query: string; error?: string }): Response {
 </style>
 </head>
 <body>
-  <form method="POST" action="/authorize?${opts.query}">
+  <form method="POST" action="/authorize?${escapeHtml(opts.query)}">
     <h1>Accès au serveur MCP Intervals.icu</h1>
     ${errorHtml}
     <label for="password">Mot de passe</label>
@@ -75,9 +75,12 @@ function loginPage(opts: { query: string; error?: string }): Response {
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "content-security-policy":
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
-      "x-frame-options": "DENY",
+      // Pas de `form-action` : claude.ai charge cette page dans un contexte
+      // (popup/webview) où le navigateur a bloqué la soumission du
+      // formulaire même vers 'self', avec une "CSP violates form-action
+      // 'self'" — constaté en conditions réelles. Le vrai verrou reste le
+      // mot de passe, pas cette restriction en plus.
+      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
       "x-content-type-options": "nosniff",
     },
   });
