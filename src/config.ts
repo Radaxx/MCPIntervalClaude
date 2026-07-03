@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Config } from "./client/config.js";
 
 const envSchema = z.object({
   INTERVALS_API_KEY: z.string().min(1, "INTERVALS_API_KEY est requis"),
@@ -6,11 +7,7 @@ const envSchema = z.object({
   INTERVALS_BASE_URL: z.string().url().optional(),
 });
 
-export interface Config {
-  apiKey: string;
-  athleteId: string;
-  baseUrl: string;
-}
+export type { Config };
 
 export function loadConfig(): Config {
   const parsed = envSchema.safeParse(process.env);

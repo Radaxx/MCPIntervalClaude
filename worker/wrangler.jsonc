@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "intervals-icu-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Un Durable Object par session MCP (McpAgent en a besoin pour gérer
+  // le transport Streamable HTTP et son état).
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MCP_OBJECT",
+        "class_name": "IntervalsMcp"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["IntervalsMcp"]
+    }
+  ],
+
+  // Requis par @cloudflare/workers-oauth-provider pour stocker les jetons.
+  // Remplace "id" par la valeur retournée par :
+  //   npx wrangler kv namespace create OAUTH_KV
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ]
+
+  // Secrets à définir avec `wrangler secret put <NOM>` (jamais dans ce fichier) :
+  //   INTERVALS_API_KEY
+  //   INTERVALS_ATHLETE_ID
+  //   OWNER_PASSWORD
+}

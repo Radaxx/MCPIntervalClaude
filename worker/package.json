@@ -1,0 +1,23 @@
+{
+  "name": "intervals-icu-mcp-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serveur MCP Intervals.icu hébergé sur Cloudflare Workers (Streamable HTTP + OAuth 2.1), pour l'utiliser comme connecteur distant dans claude.ai.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.8.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.17.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.107.0"
+  }
+}

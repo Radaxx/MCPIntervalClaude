@@ -1,4 +1,4 @@
-import type { Config } from "../config.js";
+import type { Config } from "./config.js";
 import type {
   IntervalsActivity,
   IntervalsActivityDetail,
@@ -51,7 +51,9 @@ export class IntervalsClient {
 
   constructor(private readonly config: Config) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
-    this.authHeader = `Basic ${Buffer.from(`API_KEY:${config.apiKey}`).toString("base64")}`;
+    // btoa (plutôt que Buffer) pour rester portable entre Node (stdio) et
+    // les runtimes edge sans API Node (Cloudflare Workers).
+    this.authHeader = `Basic ${btoa(`API_KEY:${config.apiKey}`)}`;
   }
 
   get athleteId(): string {

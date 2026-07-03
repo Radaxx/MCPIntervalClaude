@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "MCP server exposing Intervals.icu data (activities, wellness, athlete profile, training load, planned workouts) to Claude.",
   "type": "module",
+  "workspaces": ["worker"],
   "main": "dist/index.js",
   "bin": {
     "intervals-icu-mcp-server": "dist/index.js"
