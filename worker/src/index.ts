@@ -34,8 +34,6 @@ export class IntervalsMcp extends McpAgent<WorkerEnv> {
   }
 }
 
-const CSRF_COOKIE_NAME = "__Host-intervals_csrf";
-
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -45,7 +43,7 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function loginPage(opts: { query: string; csrfToken: string; error?: string }): Response {
+function loginPage(opts: { query: string; error?: string }): Response {
   const errorHtml = opts.error ? `<p class="error">${escapeHtml(opts.error)}</p>` : "";
   const html = `<!doctype html>
 <html lang="fr">
@@ -69,7 +67,6 @@ function loginPage(opts: { query: string; csrfToken: string; error?: string }): 
     ${errorHtml}
     <label for="password">Mot de passe</label>
     <input id="password" name="password" type="password" required autocomplete="current-password" autofocus />
-    <input type="hidden" name="csrf_token" value="${escapeHtml(opts.csrfToken)}" />
     <button type="submit">Continuer</button>
   </form>
 </body>
@@ -86,23 +83,18 @@ function loginPage(opts: { query: string; csrfToken: string; error?: string }): 
   });
 }
 
-function readCsrfCookie(request: Request): string | undefined {
-  const cookieHeader = request.headers.get("Cookie") ?? "";
-  return cookieHeader
-    .split(";")
-    .map((c) => c.trim())
-    .find((c) => c.startsWith(`${CSRF_COOKIE_NAME}=`))
-    ?.slice(CSRF_COOKIE_NAME.length + 1);
-}
-
-function csrfCookieHeader(token: string): string {
-  return `${CSRF_COOKIE_NAME}=${token}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=600`;
-}
-
 /**
  * Écran de connexion personnel avant d'accorder un jeton OAuth au client MCP
  * (claude.ai). Un seul propriétaire (toi) : le "mot de passe" est un secret
  * Worker distinct de la clé API Intervals.icu, jamais la clé elle-même.
+ *
+ * Pas de protection CSRF par cookie ici (contrairement aux exemples pour
+ * serveurs proxy vers un IdP tiers) : on n'a ni session déjà authentifiée à
+ * protéger contre un "confused deputy", ni upstream OAuth à sécuriser — le
+ * seul secret qui compte est OWNER_PASSWORD lui-même. Un cookie __Host- s'est
+ * révélé bloqué dans le contexte où claude.ai charge cette page, cassant le
+ * flow ; ça correspond à l'exemple officiel Cloudflare, qui n'en met pas non
+ * plus pour ce cas d'usage.
  */
 const defaultHandler = {
   async fetch(request: Request, rawEnv: unknown): Promise<Response> {
@@ -125,38 +117,18 @@ const defaultHandler = {
     }
 
     if (request.method === "GET") {
-      const csrfToken = crypto.randomUUID();
-      const response = loginPage({ query: url.searchParams.toString(), csrfToken });
-      response.headers.append("Set-Cookie", csrfCookieHeader(csrfToken));
-      return response;
+      return loginPage({ query: url.searchParams.toString() });
     }
 
     if (request.method === "POST") {
       const form = await request.formData();
       const password = String(form.get("password") ?? "");
-      const csrfFromForm = String(form.get("csrf_token") ?? "");
-      const csrfFromCookie = readCsrfCookie(request);
-
-      const refreshedCsrfToken = crypto.randomUUID();
-
-      if (!csrfFromCookie || !csrfFromForm || csrfFromCookie !== csrfFromForm) {
-        const response = loginPage({
-          query: url.searchParams.toString(),
-          csrfToken: refreshedCsrfToken,
-          error: "Session expirée, réessaie.",
-        });
-        response.headers.append("Set-Cookie", csrfCookieHeader(refreshedCsrfToken));
-        return response;
-      }
 
       if (!bindings.OWNER_PASSWORD || password !== bindings.OWNER_PASSWORD) {
-        const response = loginPage({
+        return loginPage({
           query: url.searchParams.toString(),
-          csrfToken: refreshedCsrfToken,
           error: "Mot de passe incorrect.",
         });
-        response.headers.append("Set-Cookie", csrfCookieHeader(refreshedCsrfToken));
-        return response;
       }
 
       const { redirectTo } = await provider.completeAuthorization({
@@ -169,10 +141,7 @@ const defaultHandler = {
 
       return new Response(null, {
         status: 302,
-        headers: {
-          Location: redirectTo,
-          "Set-Cookie": `${CSRF_COOKIE_NAME}=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0`,
-        },
+        headers: { Location: redirectTo },
       });
     }
 
