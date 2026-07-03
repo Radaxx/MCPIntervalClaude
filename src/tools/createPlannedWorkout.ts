@@ -13,10 +13,19 @@ const inputShape = {
     .string()
     .optional()
     .describe(
-      "Description de la séance. Peut utiliser la syntaxe texte structurée d'Intervals.icu " +
-        "(échauffement / intervalles / récupération avec cibles en %FTP, %allure ou %FC) : " +
-        "Intervals.icu calcule alors généralement la charge d'entraînement automatiquement. " +
-        "Laisser vide pour une simple note.",
+      "Description de la séance. Pour que ce soit une vraie séance structurée avec étapes " +
+        "(échauffement, intervalles, récupération avec cibles de puissance/allure/FC) — donc " +
+        "aussi une vraie séance structurée une fois synchronisée vers Garmin — utilise la " +
+        "syntaxe texte d'Intervals.icu : chaque étape est une ligne commençant par '-', avec " +
+        "une durée (ex: 10m, 45s) ou une distance (ex: 1km, 400m), suivie d'une cible optionnelle " +
+        "(%FTP pour le vélo, %allure ou min/km pour la course, %LTHR ou zone FC). Pour répéter un " +
+        "bloc, mets une ligne 'Nx' suivie des étapes indentées à répéter. Toute ligne qui ne " +
+        "commence pas par '-' et ne matche pas 'Nx' est un simple titre de section (libre, ignoré " +
+        "pour le calcul). Exemple validé (vélo) :\n" +
+        "Warmup\n- 10m 60-70% FTP\n\nMain set\n4x\n- 3m 105% FTP\n- 2m 55% FTP\n\nCooldown\n- 10m 55% FTP\n\n" +
+        "Avec ce format, Intervals.icu calcule automatiquement la durée totale et la charge " +
+        "d'entraînement (pas besoin de renseigner planned_duration_minutes/planned_load). " +
+        "Laisser vide (ou en prose libre) pour une simple note sans étapes ni cibles.",
     ),
   planned_duration_minutes: z
     .number()
