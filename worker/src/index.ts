@@ -1,34 +1,45 @@
-import { env } from "cloudflare:workers";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { OAuthProvider, type OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { IntervalsClient } from "../../src/client/intervalsClient.js";
 import { registerAllTools } from "../../src/tools/index.js";
+import { verifyPassword } from "./passwordHash.js";
+import { getUser } from "./userStore.js";
 
 interface WorkerEnv {
   OAUTH_KV: KVNamespace;
   OAUTH_PROVIDER: OAuthHelpers;
   MCP_OBJECT: DurableObjectNamespace;
-  INTERVALS_API_KEY: string;
-  INTERVALS_ATHLETE_ID: string;
-  INTERVALS_BASE_URL?: string;
-  OWNER_PASSWORD: string;
+  USERS_KV: KVNamespace;
+}
+
+/** Identité + identifiants Intervals.icu de la personne connectée pour cette session MCP. */
+interface IntervalsMcpProps extends Record<string, unknown> {
+  userId: string;
+  intervalsApiKey: string;
+  intervalsAthleteId: string;
+  intervalsBaseUrl?: string;
 }
 
 /**
- * Serveur MCP Intervals.icu, en lecture seule, exposé via Streamable HTTP.
- * Une instance (Durable Object) est créée par session cliente ; init() est
- * rappelé à chaque démarrage de session pour enregistrer les 6 tools.
+ * Serveur MCP Intervals.icu, exposé via Streamable HTTP. Une instance
+ * (Durable Object) est créée par session cliente ; init() est rappelé à
+ * chaque démarrage de session pour enregistrer les 9 tools, avec le client
+ * Intervals.icu construit à partir des identifiants de la personne connectée
+ * (this.props, posés par completeAuthorization dans defaultHandler) —
+ * jamais un compte global partagé.
  */
-export class IntervalsMcp extends McpAgent<WorkerEnv> {
+export class IntervalsMcp extends McpAgent<WorkerEnv, unknown, IntervalsMcpProps> {
   server = new McpServer({ name: "intervals-icu", version: "0.1.0" });
 
   async init(): Promise<void> {
-    const bindings = env as unknown as WorkerEnv;
+    if (!this.props) {
+      throw new Error("Session MCP sans identité authentifiée (this.props manquant).");
+    }
     const client = new IntervalsClient({
-      apiKey: bindings.INTERVALS_API_KEY,
-      athleteId: bindings.INTERVALS_ATHLETE_ID,
-      baseUrl: bindings.INTERVALS_BASE_URL ?? "https://intervals.icu/api/v1",
+      apiKey: this.props.intervalsApiKey,
+      athleteId: this.props.intervalsAthleteId,
+      baseUrl: this.props.intervalsBaseUrl ?? "https://intervals.icu/api/v1",
     });
     registerAllTools(this.server, client);
   }
@@ -65,8 +76,10 @@ function loginPage(opts: { query: string; error?: string }): Response {
   <form method="POST" action="/authorize?${escapeHtml(opts.query)}">
     <h1>Accès au serveur MCP Intervals.icu</h1>
     ${errorHtml}
+    <label for="username">Identifiant</label>
+    <input id="username" name="username" type="text" required autocomplete="username" autofocus />
     <label for="password">Mot de passe</label>
-    <input id="password" name="password" type="password" required autocomplete="current-password" autofocus />
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
     <button type="submit">Continuer</button>
   </form>
 </body>
@@ -78,8 +91,8 @@ function loginPage(opts: { query: string; error?: string }): Response {
       // Pas de `form-action` : claude.ai charge cette page dans un contexte
       // (popup/webview) où le navigateur a bloqué la soumission du
       // formulaire même vers 'self', avec une "CSP violates form-action
-      // 'self'" — constaté en conditions réelles. Le vrai verrou reste le
-      // mot de passe, pas cette restriction en plus.
+      // 'self'" — constaté en conditions réelles. Le vrai verrou reste
+      // l'identifiant/mot de passe, pas cette restriction en plus.
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
       "x-content-type-options": "nosniff",
     },
@@ -87,17 +100,21 @@ function loginPage(opts: { query: string; error?: string }): Response {
 }
 
 /**
- * Écran de connexion personnel avant d'accorder un jeton OAuth au client MCP
- * (claude.ai). Un seul propriétaire (toi) : le "mot de passe" est un secret
- * Worker distinct de la clé API Intervals.icu, jamais la clé elle-même.
+ * Écran de connexion multi-utilisateurs avant d'accorder un jeton OAuth au
+ * client MCP (claude.ai). Chaque compte (identifiant + mot de passe haché +
+ * identifiants Intervals.icu propres) vit dans USERS_KV, créé par l'admin
+ * via `npm run add-user` — pas d'inscription publique. Le jeton émis porte
+ * les identifiants Intervals.icu de LA personne qui vient de se connecter
+ * (props), jamais un compte global partagé.
+ *
+ * Message d'erreur volontairement générique ("identifiants incorrects")
+ * pour ne pas révéler si un identifiant existe.
  *
  * Pas de protection CSRF par cookie ici (contrairement aux exemples pour
  * serveurs proxy vers un IdP tiers) : on n'a ni session déjà authentifiée à
- * protéger contre un "confused deputy", ni upstream OAuth à sécuriser — le
- * seul secret qui compte est OWNER_PASSWORD lui-même. Un cookie __Host- s'est
- * révélé bloqué dans le contexte où claude.ai charge cette page, cassant le
- * flow ; ça correspond à l'exemple officiel Cloudflare, qui n'en met pas non
- * plus pour ce cas d'usage.
+ * protéger contre un "confused deputy", ni upstream OAuth à sécuriser. Un
+ * cookie __Host- s'est révélé bloqué dans le contexte où claude.ai charge
+ * cette page (constaté en conditions réelles), d'où son absence.
  */
 const defaultHandler = {
   async fetch(request: Request, rawEnv: unknown): Promise<Response> {
@@ -125,20 +142,31 @@ const defaultHandler = {
 
     if (request.method === "POST") {
       const form = await request.formData();
+      const username = String(form.get("username") ?? "").trim();
       const password = String(form.get("password") ?? "");
 
-      if (!bindings.OWNER_PASSWORD || password !== bindings.OWNER_PASSWORD) {
+      const user = username ? await getUser(bindings.USERS_KV, username) : null;
+      const valid = user ? await verifyPassword(password, user.passwordHash) : false;
+
+      if (!user || !valid) {
         return loginPage({
           query: url.searchParams.toString(),
-          error: "Mot de passe incorrect.",
+          error: "Identifiant ou mot de passe incorrect.",
         });
       }
 
+      const props: IntervalsMcpProps = {
+        userId: username.toLowerCase(),
+        intervalsApiKey: user.intervalsApiKey,
+        intervalsAthleteId: user.intervalsAthleteId,
+        intervalsBaseUrl: user.intervalsBaseUrl,
+      };
+
       const { redirectTo } = await provider.completeAuthorization({
         request: oauthReqInfo,
-        userId: bindings.INTERVALS_ATHLETE_ID,
+        userId: props.userId,
         scope: [],
-        props: { userId: bindings.INTERVALS_ATHLETE_ID },
+        props,
         metadata: undefined,
       });
 

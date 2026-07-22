@@ -1,12 +1,8 @@
-# Secrets utilisés par `wrangler dev` en local (fichier lu automatiquement,
-# jamais commité). En production, définis ces mêmes clés avec :
-#   wrangler secret put INTERVALS_API_KEY
-#   wrangler secret put INTERVALS_ATHLETE_ID
-#   wrangler secret put OWNER_PASSWORD
-
-INTERVALS_API_KEY=
-INTERVALS_ATHLETE_ID=
-
-# Mot de passe personnel demandé par la page /authorize avant d'autoriser
-# claude.ai (ou tout autre client MCP) à obtenir un jeton d'accès.
-OWNER_PASSWORD=
+# Ce serveur est multi-utilisateurs : plus aucun secret Worker requis pour
+# l'authentification. Les comptes (identifiant, mot de passe, identifiants
+# Intervals.icu propres à chacun) vivent dans le KV namespace USERS_KV,
+# géré avec `npm run add-user` (voir README) — pas via ce fichier.
+#
+# `wrangler dev` simule automatiquement USERS_KV et OAUTH_KV en local,
+# donc tu peux directement y créer des comptes de test avec :
+#   npm run add-user -- <identifiant> <mot_de_passe> <cle_api> <athlete_id> --local

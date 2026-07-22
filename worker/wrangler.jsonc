@@ -22,18 +22,24 @@
     }
   ],
 
-  // Requis par @cloudflare/workers-oauth-provider pour stocker les jetons.
-  // Remplace "id" par la valeur retournée par :
-  //   npx wrangler kv namespace create OAUTH_KV
   "kv_namespaces": [
     {
+      // Requis par @cloudflare/workers-oauth-provider pour stocker les jetons.
+      // id obtenu via : npx wrangler kv namespace create OAUTH_KV
       "binding": "OAUTH_KV",
       "id": "7742d27afc6c4c25bac0933d06257c44"
+    },
+    {
+      // Comptes utilisateurs (identifiant, mot de passe haché, identifiants
+      // Intervals.icu propres à chacun). Remplace "id" par la valeur
+      // retournée par : npx wrangler kv namespace create USERS_KV
+      // Comptes créés/modifiés avec `npm run add-user` (voir README).
+      "binding": "USERS_KV",
+      "id": "REPLACE_WITH_YOUR_USERS_KV_NAMESPACE_ID"
     }
   ]
 
-  // Secrets à définir avec `wrangler secret put <NOM>` (jamais dans ce fichier) :
-  //   INTERVALS_API_KEY
-  //   INTERVALS_ATHLETE_ID
-  //   OWNER_PASSWORD
+  // Plus aucun secret Worker requis pour l'authentification : les
+  // identifiants Intervals.icu de chaque personne vivent dans USERS_KV,
+  // pas dans des `wrangler secret put` globaux.
 }
